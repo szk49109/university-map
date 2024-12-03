@@ -17,7 +17,8 @@ if ('serviceWorker' in navigator) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-	const url = "https://script.google.com/macros/s/AKfycbyjhPcniuUvKH7oBzoVP390fMiXnGFnpa9zd5PH7_gW_u0Uxdxv03unM_-PG0I0rE4n/exec";
+	// const url = "https://script.google.com/macros/s/AKfycbyjhPcniuUvKH7oBzoVP390fMiXnGFnpa9zd5PH7_gW_u0Uxdxv03unM_-PG0I0rE4n/exec";
+	const url = "https://script.google.com/macros/s/AKfycbxcuykF3Lv4xvnuQXmDrhguaE-G4b0J7HBX3LQQloDEP99BoiDzBXc1dqqe9-kIvtgv/exec";
 
   fetch(url)
 		.then((response) => response.json())
