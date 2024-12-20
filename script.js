@@ -16,15 +16,6 @@ if ('serviceWorker' in navigator) {
 	});
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-	const url = "https://script.google.com/macros/s/AKfycbyjhPcniuUvKH7oBzoVP390fMiXnGFnpa9zd5PH7_gW_u0Uxdxv03unM_-PG0I0rE4n/exec";
-
-  fetch(url)
-		.then((response) => response.json())
-		.then((data) => {console.log(data)})
-		.catch((error) => console.log(error));
-});
-
 CameraControls.install({THREE: THREE});
 
 // レンダラーの作成
@@ -53,8 +44,7 @@ cameras[1].far = 2000;
 const mapArea = document.getElementById("mapArea");
 const headerArea = document.getElementById("headerArea");
 
-// レンダラーとカメラのサイズの初期化
-resize();
+
 
 // camera-controlsの作成と設定
 const clock = new THREE.Clock();
@@ -102,13 +92,42 @@ let mapMode = 0;
 
 // マップが遷移済みか遷移中かのフラグ
 let isTransitionedMap = true;
-transitionMap("全体マップ");
 
-// レンダーループ
-renderer.setAnimationLoop(animation);
+// アイコンのパス
+const iconPath = "data/icon/";
+
+document.addEventListener("DOMContentLoaded", initialize);
+
+let mapInfoList = null;
+let buildingIcons = null;
+async function initialize() {
+	// const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
+	const url = "https://script.google.com/macros/s/AKfycbzvO7TkGmvXNKnMMGmvVYbeN4WxkOEMCxJIi7bynQv0Qp1XA8SPrir8lcDPG9LUguDq/exec";
+
+	// レンダラーとカメラのサイズの初期化
+	resize();
+
+	try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(response.status);
+		}
+		mapInfoList = await response.json();
+	} catch (error) {
+		console.log(error);
+	}
+
+	buildingIcons = generateBuildingIcons(mapInfoList);
+	console.log(mapInfoList, buildingIcons);
+
+	await transitionMap("全体マップ");
+
+	// レンダーループ
+	renderer.setAnimationLoop(animate);
+}
 
 // この関数をループさせている
-function animation() {
+function animate() {
 	// カメラの位置と向きを更新
 	const delta = clock.getDelta();
 	const hasControlsUpdated = cameraControls[cameraMode].update(delta);
@@ -118,6 +137,7 @@ function animation() {
 
 	if (hasControlsUpdated) {
 		// 教室名やアイコンなどをマップのオブジェクトに付ける関数
+		console.log(cameras[cameraMode].zoom);
 		setMapInfoPosition();
 	}
 	
@@ -142,7 +162,7 @@ function setMapInfoPosition() {
 
 		// すべてのmapInfoの座標を取得する
 		for (let mapInfo of document.getElementsByClassName("mapInfo")) {
-			const mapObj = scenes[currentSceneName].getObjectByName(currentMapName).getObjectByName(mapInfo.dataset.mapObj);
+			const mapObj = scenes[currentSceneName].getObjectByName(currentMapName).getObjectByName(mapInfo.dataset.id);
 			if (mapObj) {
 				// 引数の名前のオブジェクトのcanvas上のx座標とy座標を返す関数
 				let [x, y, z] = getMapObjectCoord(mapObj);
@@ -164,7 +184,7 @@ function setMapInfoPosition() {
 
 		let layer = 1;
 		for (let mapObjCoord of mapObjCoords) {
-			const selector = "[data-map-obj=\"" + mapObjCoord.name + "\"]";
+			const selector = "[data-id=\"" + mapObjCoord.name + "\"]";
 			const mapInfo = document.querySelector(selector);
 			mapInfo.classList.toggle("hidden", mapObjCoord.z >= 1);
 			let x = (rendererWidth / 2) * (mapObjCoord.x + 1);
@@ -197,67 +217,64 @@ function getMapObjectCoord(target) {
 
 // 教室名やアイコンなどを作る関数
 function createMapInfo(maps) {
-	console.log(maps);
-	const mapInfoIcon = new MapInfoIcon();
-	const icons = mapInfoIcon.icons;
-	const iconsForBuilding = mapInfoIcon.iconsForBuilding;
-
 	switch (mapMode) {
 		case 0:
 			for (let mapObj of maps[0].children) {
 				const mapObjName = mapObj.name.normalize("NFKC");
 				const splitMapObjName = mapObjName.split("_");
+				console.log(mapObjName);
 
 				if (splitMapObjName[0] != "object") {
-					if (Object.keys(icons).includes(splitMapObjName[0])) {
-						// アイコンを作る
-						const mapInfo = document.createElement("div");
-						mapInfo.classList.add("mapInfo");
-						mapInfo.classList.add("icon");
-						mapInfo.dataset.mapObj = mapObj.name;
-						mapInfo.dataset.filterItem = icons[splitMapObjName[0]]["filterItem"];
+					const mapInfoProps = mapInfoList.find((item) => item.id == mapObjName);
+					const mapInfo = document.createElement("div");
+					mapInfo.classList.add("mapInfo");
 
-						if (icons[splitMapObjName[0]]["shouldShowMapObjName"]) {
-							mapInfo.textContent = splitMapObjName[0];
+					if (mapInfoProps) {
+						switch (mapInfoProps.attribute) {
+							case "名前付きアイコン":
+								mapInfo.textContent = mapInfoProps.name;
+							case "アイコン":
+								// アイコンを作る
+								mapInfo.classList.add("icon");
+								mapInfo.dataset.id = mapInfoProps.id;
+								mapInfo.dataset.filterItem = mapInfoProps.filterItem;
+								const icon = document.createElement("img");
+								icon.src = iconPath + mapInfoProps.icon;
+								icon.height = 20;
+								mapInfo.prepend(icon);
+								mapArea.append(mapInfo);
+								break;
+	
+							default:
+								break;
 						}
-						const icon = document.createElement("img");
-						icon.src = mapInfoIcon.iconPath + icons[splitMapObjName[0]]["fileName"];
-						icon.alt = splitMapObjName[0];
-						icon.height = 20;
-
-						mapInfo.prepend(icon);
-						mapArea.append(mapInfo);
 					} else {
 						// 建物の情報を作る
-						const mapInfo = document.createElement("div");
-						mapInfo.classList.add("mapInfo");
 						mapInfo.classList.add("building");
 						mapInfo.classList.add("destinationName");
-						mapInfo.dataset.mapObj = mapObj.name;
+						mapInfo.dataset.id = mapObjName;
 						mapInfo.dataset.destination = mapObjName;
 
 						const name = document.createElement("div");
 						name.classList.add("name");
-						name.textContent = splitMapObjName[0];
+						name.textContent = mapObjName;
 
 						const buildingIconList = document.createElement("div");
 						buildingIconList.classList.add("buildingIconList");
-						if (Object.keys(iconsForBuilding).includes(mapObjName)) {
-							for (let iconForMapObjName of iconsForBuilding[mapObjName]) {
+						if (Object.keys(buildingIcons).includes(mapObjName)) {
+							for (const buildingIconProps of buildingIcons[mapObjName]) {
 								const iconWrapper = document.createElement("div");
 								iconWrapper.classList.add("icon");
-								iconWrapper.dataset.filterItem = iconForMapObjName["filterItem"];
+								iconWrapper.dataset.filterItem = buildingIconProps.filterItem;
 
 								const icon = document.createElement("img");
-								icon.src = mapInfoIcon.iconPath + iconForMapObjName["fileName"];
-								icon.alt = iconForMapObjName["filterItem"];
+								icon.src = buildingIconProps.src;
 								icon.height = 20;
 
 								iconWrapper.append(icon)
 								buildingIconList.append(iconWrapper);
 							}
 						}
-
 						mapInfo.append(name, buildingIconList);
 						mapArea.append(mapInfo);
 					}
@@ -267,37 +284,34 @@ function createMapInfo(maps) {
 
 		case 1:
 			for (let map of maps) {
+				// 階の表示を作る
 				const mapInfo = document.createElement("div");
 				mapInfo.classList.add("mapInfo");
 				mapInfo.classList.add("destinationName");
 				mapInfo.classList.add("floor");
-				mapInfo.dataset.mapObj = map.name;
+				mapInfo.dataset.id = map.name;
 				mapInfo.dataset.destination = map.name;
 				mapInfo.textContent = map.name;
 				mapArea.append(mapInfo);
 
 				for (let mapObj of map.children) {
 					const mapObjName = mapObj.name.normalize("NFKC");
-					const splitMapObjName = mapObjName.split("_");
+					const mapInfoProps = mapInfoList.find((item) => item.id == mapObjName);
 
-					if (splitMapObjName[0] != "object") {
-						if (Object.keys(icons).includes(splitMapObjName[0])) {
-							if (icons[splitMapObjName[0]]["filterItem"]) {
-								// アイコンを作る
-								const mapInfo = document.createElement("div");
-								mapInfo.classList.add("mapInfo");
-								mapInfo.classList.add("icon");
-								mapInfo.dataset.mapObj = mapObj.name;
-								mapInfo.dataset.filterItem = icons[splitMapObjName[0]]["filterItem"];
+					if (mapInfoProps) {
+						const mapInfo = document.createElement("div");
+						mapInfo.classList.add("mapInfo");
+						if (mapInfoProps.filterItem) {
+							// アイコンを作る
+							mapInfo.classList.add("icon");
+							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.filterItem = mapInfoProps.filterItem;
 
-								const icon = document.createElement("img");
-								icon.src = mapInfoIcon.iconPath + icons[splitMapObjName[0]]["fileName"];
-								icon.alt = splitMapObjName[0];
-								icon.height = 20;
-
-								mapInfo.prepend(icon);
-								mapArea.append(mapInfo);
-							}
+							const icon = document.createElement("img");
+							icon.src = iconPath + mapInfoProps.icon;
+							icon.height = 20;
+							mapInfo.prepend(icon);
+							mapArea.append(mapInfo);
 						}
 					}
 				}
@@ -306,57 +320,44 @@ function createMapInfo(maps) {
 
 		case 2:
 			for (let mapObj of maps[0].children) {
-				console.log(mapObj.name);
 				const mapObjName = mapObj.name.normalize("NFKC");
-				const splitMapObjName = mapObjName.split("_");
+				const mapInfoProps = mapInfoList.find((item) => item.id == mapObjName);
 
-				if (splitMapObjName[0] != "object") {
-					if (splitMapObjName[0] == "transitionTo") {
-						const mapInfo = document.createElement("div");
-						mapInfo.classList.add("mapInfo");
-						mapInfo.classList.add("destinationName");
-						mapInfo.dataset.mapObj = mapObj.name;
-						if (splitMapObjName[1] == "全体マップ") {
-							const destinationName = document.createElement("div");
-							destinationName.textContent = "出入口";
-							mapInfo.append(destinationName);
-							mapInfo.dataset.destination = splitMapObjName[1];
-						} else {
-							for (let i = 1; i <= 2; i++) {
-								const destinationName = document.createElement("div");
-								destinationName.textContent = splitMapObjName[i];
-								if (i == 2) destinationName.classList.add("floor");
-								mapInfo.append(destinationName);
-							}
-							mapInfo.dataset.destination = splitMapObjName[1] + "_" + splitMapObjName[2];
-						}
-						mapArea.append(mapInfo);
-					} else if (Object.keys(icons).includes(splitMapObjName[0])) {
-						// アイコンを作る
-						const mapInfo = document.createElement("div");
-						mapInfo.classList.add("mapInfo");
-						mapInfo.classList.add("icon");
-						mapInfo.dataset.mapObj = mapObj.name;
-						mapInfo.dataset.filterItem = icons[splitMapObjName[0]]["filterItem"];
+				if (mapInfoProps) {
+					const mapInfo = document.createElement("div");
+					mapInfo.classList.add("mapInfo");
+					switch (mapInfoProps.attribute) {
+						case "遷移":
+							// 遷移要素を作る
+							mapInfo.classList.add("destinationName");
+							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.destination = mapInfoProps.destination;
+							mapInfo.textContent = mapInfoProps.name;
+							mapArea.append(mapInfo);
+							break;
 
-						if (icons[splitMapObjName[0]]["shouldShowMapObjName"]) {
-							mapInfo.textContent = splitMapObjName[0];
-						}
-						const icon = document.createElement("img");
-						icon.src = mapInfoIcon.iconPath + icons[splitMapObjName[0]]["fileName"];
-						icon.alt = splitMapObjName[0];
-						icon.height = 20;
+						
+						case "名前付きアイコン":
+							mapInfo.textContent = mapInfoProps.name;
+						case "アイコン":
+							// アイコンを作る
+							mapInfo.classList.add("icon");
+							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.filterItem = mapInfoProps.filterItem;
+							const icon = document.createElement("img");
+							icon.src = iconPath + mapInfoProps.icon;
+							icon.height = 20;
+							mapInfo.prepend(icon);
+							mapArea.append(mapInfo);
+							break;
 
-						mapInfo.prepend(icon);
-						mapArea.append(mapInfo);
-					} else {
-						// 教室名を作る
-						const mapInfo = document.createElement("div");
-						mapInfo.classList.add("mapInfo");
-						mapInfo.classList.add("name");
-						mapInfo.dataset.mapObj = mapObj.name;
-						mapInfo.textContent = splitMapObjName[0];
-						mapArea.append(mapInfo);
+						default:
+							// 教室名を作る
+							mapInfo.classList.add("name");
+							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.textContent = mapInfoProps.name;
+							mapArea.append(mapInfo);
+							break;
 					}
 				}
 			}
@@ -437,7 +438,7 @@ async function loadMap(maps) {
 	const distance = 1.5;
 
 	let count = 0;
-	for (let fileName in maps) {
+	for (const fileName in maps) {
 		const mapDataPath = maps[fileName]["dirPath"] + fileName;
 		const glb = await loader.loadAsync(mapDataPath);
 		const map = glb.scene;
@@ -488,7 +489,7 @@ async function moveCameraTo(floorName = null) {
 
 // 3Dモデルのクリックの設定
 const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
+let pointer = new THREE.Vector2();
 const mapNav = document.getElementById("mapNav");
 mapNav.addEventListener("click", function(event) {
 	if (event.target.classList.contains("mapName") && !event.target.classList.contains("current")) {
@@ -769,10 +770,46 @@ function resize() {
 	setMapInfoPosition();
 }
 
-mapArea.addEventListener("pointerdown", handleMapAreaPointerdown);
-mapArea.addEventListener("pointermove", handleMapAreaPointermove);
-mapArea.addEventListener("pointerup", handleMapAreaPointerup);
-mapArea.addEventListener("pointercancel", handleMapAreaPointercancel);
+function generateBuildingIcons(mapInfoList) {
+	const filterItemNames = Array.from(filterList.getElementsByClassName("itemName"))
+		.map((itemName) => itemName.textContent);
+	const filterImgSources = Array.from(filterList.getElementsByTagName("img"))
+		.map((filterImg) => filterImg.getAttribute("src"));
+
+	let buildingIcons = mapInfoList.reduce((acc, item) => {
+		const building = item.building;
+		const filterItem = item.filterItem;
+
+		if (filterItem && building) {
+			if (!acc[building]) {
+				acc[building] = new Set();
+			}
+			acc[building].add(filterItem);
+		}
+
+		return acc;
+	}, {});
+
+	for (const key in buildingIcons) {
+		buildingIcons[key] = Array.from(buildingIcons[key]).map((filterItem) => {
+			const index = filterItemNames.findIndex((filterItemName) => filterItemName == filterItem);
+			return {
+				"src": filterImgSources[index],
+				"filterItem": filterItem
+			};
+		});
+		buildingIcons[key].sort((a, b) => {
+			return filterItemNames.indexOf(a.filterItem) - filterItemNames.indexOf(b.filterItem);
+		});
+	}
+	
+	return buildingIcons;
+}
+
+mapArea.addEventListener("pointerdown", onMapAreaPointerdown);
+mapArea.addEventListener("pointermove", onMapAreaPointermove);
+mapArea.addEventListener("pointerup", onMapAreaPointerup);
+mapArea.addEventListener("pointercancel", onMapAreaPointercancel);
 
 let pointerdownCoord = {};
 let deltaPointerCoord = {};
@@ -780,7 +817,7 @@ let pointerId = null;
 let prevCameraPosition = new THREE.Vector3();
 let prevTargetPosition = new THREE.Vector3();
 
-function handleMapAreaPointerdown(event) {
+function onMapAreaPointerdown(event) {
 	if (!pointerId) {
 		pointerId = event.pointerId;
 		cameraControls[cameraMode].getPosition(prevCameraPosition, true);
@@ -796,14 +833,14 @@ function handleMapAreaPointerdown(event) {
 	}
 }
 
-function handleMapAreaPointermove(event) {
+function onMapAreaPointermove(event) {
 	if (pointerId == event.pointerId) {
 		deltaPointerCoord["x"] = event.clientX - pointerdownCoord["x"];
 		deltaPointerCoord["y"] = event.clientY - pointerdownCoord["y"];
 	}
 }
 
-function handleMapAreaPointerup(event) {
+function onMapAreaPointerup(event) {
 	if (pointerId == event.pointerId) {
 		if (Math.abs(deltaPointerCoord["x"]) < 5 && Math.abs(deltaPointerCoord["y"]) < 5) {
 			const clickedMapInfo = (function() {
@@ -869,7 +906,7 @@ function handleMapAreaPointerup(event) {
 	}
 }
 
-function handleMapAreaPointercancel(event) {
+function onMapAreaPointercancel(event) {
 	if (pointerId == event.pointerId) {
 		pointerId = null;
 	}
@@ -906,7 +943,7 @@ footerArea.addEventListener("click", function(event) {
 document.querySelectorAll(".modalWindow a, #overlay").forEach((element) => {
 	element.addEventListener("click", function(event) {
 		overlay.classList.add("hidden");
-		for (let modalWindow of modalWindows) {
+		for (const modalWindow of modalWindows) {
 			modalWindow.classList.add("hidden");
 		}
 		controlScroll(false);
