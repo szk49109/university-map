@@ -137,7 +137,7 @@ function animate() {
 
 	if (hasControlsUpdated) {
 		// 教室名やアイコンなどをマップのオブジェクトに付ける関数
-		console.log(cameras[cameraMode].zoom);
+		// console.log(cameras[cameraMode].zoom);
 		setMapInfoPosition();
 	}
 	
