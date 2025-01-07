@@ -101,8 +101,10 @@ document.addEventListener("DOMContentLoaded", initialize);
 let mapInfoList = null;
 let buildingIcons = null;
 async function initialize() {
-	// const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
-	const url = "https://script.google.com/macros/s/AKfycbzvO7TkGmvXNKnMMGmvVYbeN4WxkOEMCxJIi7bynQv0Qp1XA8SPrir8lcDPG9LUguDq/exec";
+	// テスト
+	const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
+	// 正式
+	// const url = "https://script.google.com/macros/s/AKfycbzvO7TkGmvXNKnMMGmvVYbeN4WxkOEMCxJIi7bynQv0Qp1XA8SPrir8lcDPG9LUguDq/exec";
 
 	// レンダラーとカメラのサイズの初期化
 	resize();
@@ -126,6 +128,63 @@ async function initialize() {
 	renderer.setAnimationLoop(animate);
 }
 
+function updateMapInfoDisplay(currentPriority) {
+	if (cameras[cameraMode].zoom >= 4) {
+		if (currentPriority != 3) {
+			const prevPriority = currentPriority;
+			currentPriority = 3;
+			const targetSelector = generateSelectorByPriority(prevPriority);
+			const newSelector = generateSelectorByPriority(currentPriority);
+			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
+			for (let i = 0; i < styleSheet.cssRules.length; i++) {
+				if (styleSheet.cssRules[i].selectorText == targetSelector) {
+					styleSheet.cssRules[i].selectorText = newSelector;
+					break;
+				}
+			}
+		}
+	} else if (cameras[cameraMode].zoom >= 2.5) {
+		if (currentPriority != 2) {
+			const prevPriority = currentPriority;
+			currentPriority = 2;
+			const targetSelector = generateSelectorByPriority(prevPriority);
+			const newSelector = generateSelectorByPriority(currentPriority);
+			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
+			for (let i = 0; i < styleSheet.cssRules.length; i++) {
+				if (styleSheet.cssRules[i].selectorText == targetSelector) {
+					styleSheet.cssRules[i].selectorText = newSelector;
+					break;
+				}
+			}
+		}
+	} else if (cameras[cameraMode].zoom >= 1) {
+		if (currentPriority != 1) {
+			const prevPriority = currentPriority;
+			currentPriority = 1;
+			const targetSelector = generateSelectorByPriority(prevPriority);
+			const newSelector = generateSelectorByPriority(currentPriority);
+			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
+			for (let i = 0; i < styleSheet.cssRules.length; i++) {
+				if (styleSheet.cssRules[i].selectorText == targetSelector) {
+					styleSheet.cssRules[i].selectorText = newSelector;
+					break;
+				}
+			}
+		}
+	}
+	return currentPriority;
+}
+
+function generateSelectorByPriority(priority) {
+	let selector = "";
+	for (let i = 3; i > priority; i--) {
+		if (i != 3) selector += ", ";
+		selector += "[data-priority=\"" + i + "\"]";
+	}
+	return selector;
+}
+
+let currentPriority = 1;
 // この関数をループさせている
 function animate() {
 	// カメラの位置と向きを更新
@@ -136,8 +195,9 @@ function animate() {
 	renderer.render(scenes[currentSceneName], cameras[cameraMode]);
 
 	if (hasControlsUpdated) {
-		// 教室名やアイコンなどをマップのオブジェクトに付ける関数
 		// console.log(cameras[cameraMode].zoom);
+		currentPriority = updateMapInfoDisplay(currentPriority);
+		// 教室名やアイコンなどをマップのオブジェクトに付ける関数
 		setMapInfoPosition();
 	}
 	
@@ -355,6 +415,7 @@ function createMapInfo(maps) {
 							// 教室名を作る
 							mapInfo.classList.add("name");
 							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.priority = mapInfoProps.priority;
 							mapInfo.textContent = mapInfoProps.name;
 							mapArea.append(mapInfo);
 							break;
