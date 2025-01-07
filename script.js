@@ -143,7 +143,7 @@ function updateMapInfoDisplay(currentPriority) {
 				}
 			}
 		}
-	} else if (cameras[cameraMode].zoom >= 2.5) {
+	} else if (cameras[cameraMode].zoom >= 3) {
 		if (currentPriority != 2) {
 			const prevPriority = currentPriority;
 			currentPriority = 2;
