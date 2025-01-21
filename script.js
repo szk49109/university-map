@@ -2,7 +2,6 @@ import * as THREE from "three";
 import CameraControls from "camera-controls";
 import {GLTFLoader} from "three/addons/loaders/GLTFLoader.js";
 import {MapData} from "./mapData.js";
-import {MapInfoIcon} from "./mapInfoIcon.js";
 import {buildingRooms} from "./building.js";
 
 if ('serviceWorker' in navigator) {
@@ -102,7 +101,7 @@ let mapInfoList = null;
 let buildingIcons = null;
 async function initialize() {
 	// テスト
-	// const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
+	// const url = "https://script.google.com/macros/s/AKfycby1esGNaeMgekhaxVFen1UY_i1OQ8H6rhFpiCElMhtwJkdktf_Cpk9JLAlqYT4d6UGo/exec";
 	// 正式
 	const url = "https://script.google.com/macros/s/AKfycbzctuWuhGcYI4qFwHgYxNAcRqXMR-WGvP-toGL1JSAtj20lKU4bowkSmeNn9594fv7M/exec";
 
@@ -128,50 +127,48 @@ async function initialize() {
 	renderer.setAnimationLoop(animate);
 }
 
+function showLoading() {
+	const loading = document.getElementById("loading");
+	loading.classList.remove("hidden");
+}
+
+function hideLoading() {
+	const loading = document.getElementById('loading');
+	const fadeOut = loading.animate({opacity: [1, 0]}, {duration: 250, easing: "ease"});
+	fadeOut.onfinish = () => {
+		loading.classList.add("hidden");
+	};
+}
+
 function updateMapInfoDisplay(currentPriority) {
-	if (cameras[cameraMode].zoom >= 4) {
-		if (currentPriority != 3) {
-			const prevPriority = currentPriority;
-			currentPriority = 3;
-			const targetSelector = generateSelectorByPriority(prevPriority);
-			const newSelector = generateSelectorByPriority(currentPriority);
-			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
+	const priorityToZoomThreshold = [
+		{priority: 3, zoomThreshold: 5},
+		{priority: 2, zoomThreshold: 3.5},
+		{priority: 1, zoomThreshold: 1}
+	];
+
+	const newPriority = priorityToZoomThreshold.find((item) => {
+		return cameras[cameraMode].zoom >= item.zoomThreshold;
+	}).priority;
+
+	if (currentPriority != newPriority) {
+		const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
+		const targetSelector = generateSelectorByPriority(currentPriority);
+		const newSelector = generateSelectorByPriority(newPriority);
+		if (targetSelector) {
 			for (let i = 0; i < styleSheet.cssRules.length; i++) {
 				if (styleSheet.cssRules[i].selectorText == targetSelector) {
-					styleSheet.cssRules[i].selectorText = newSelector;
+					styleSheet.deleteRule(i);
 					break;
 				}
 			}
 		}
-	} else if (cameras[cameraMode].zoom >= 3) {
-		if (currentPriority != 2) {
-			const prevPriority = currentPriority;
-			currentPriority = 2;
-			const targetSelector = generateSelectorByPriority(prevPriority);
-			const newSelector = generateSelectorByPriority(currentPriority);
-			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
-			for (let i = 0; i < styleSheet.cssRules.length; i++) {
-				if (styleSheet.cssRules[i].selectorText == targetSelector) {
-					styleSheet.cssRules[i].selectorText = newSelector;
-					break;
-				}
-			}
+		if (newSelector) { 
+			styleSheet.insertRule(newSelector + " {display: none;}");
 		}
-	} else if (cameras[cameraMode].zoom >= 1) {
-		if (currentPriority != 1) {
-			const prevPriority = currentPriority;
-			currentPriority = 1;
-			const targetSelector = generateSelectorByPriority(prevPriority);
-			const newSelector = generateSelectorByPriority(currentPriority);
-			const styleSheet = Array.from(document.styleSheets).find((ss) => ss.ownerNode.id == "mainStyleSheet");
-			for (let i = 0; i < styleSheet.cssRules.length; i++) {
-				if (styleSheet.cssRules[i].selectorText == targetSelector) {
-					styleSheet.cssRules[i].selectorText = newSelector;
-					break;
-				}
-			}
-		}
+		currentPriority = newPriority;
 	}
+
 	return currentPriority;
 }
 
@@ -195,7 +192,7 @@ function animate() {
 	renderer.render(scenes[currentSceneName], cameras[cameraMode]);
 
 	if (hasControlsUpdated) {
-		// console.log(cameras[cameraMode].zoom);
+		console.log(cameras[cameraMode].zoom);
 		currentPriority = updateMapInfoDisplay(currentPriority);
 		// 教室名やアイコンなどをマップのオブジェクトに付ける関数
 		setMapInfoPosition();
@@ -216,39 +213,43 @@ function animate() {
 
 // 教室名やアイコンなどをマップのオブジェクトに付ける関数
 function setMapInfoPosition() {
+	let mapObjCoords = [];
 	if (document.querySelector("#mapNav .current")) {
 		const currentMapName = document.querySelector("#mapNav .current").textContent;
-		let mapObjCoords = [];
 
 		// すべてのmapInfoの座標を取得する
 		for (let mapInfo of document.getElementsByClassName("mapInfo")) {
-			const mapObj = scenes[currentSceneName].getObjectByName(currentMapName).getObjectByName(mapInfo.dataset.id);
-			if (mapObj) {
+			try {
+				const mapObj = scenes[currentSceneName].getObjectByName(currentMapName).getObjectByName(mapInfo.dataset.id);
+
 				// 引数の名前のオブジェクトのcanvas上のx座標とy座標を返す関数
-				let [x, y, z] = getMapObjectCoord(mapObj);
+				let {x, y, z} = getMapObjectCoord(mapObj);
 				
 				let mapObjCoord = {
-					"name": mapObj.name,
-					"x": x,
-					"y": y,
+					"id": mapInfo.dataset.id,
+					"x": (rendererWidth / 2) * (x + 1),
+					"y": (rendererHeight / 2) * -(y - 1),
 					"z": z
 				};
 
 				mapObjCoords.push(mapObjCoord);
+			} catch(error) {
+				console.log(error);
+				console.log(mapInfo);
 			}
 		}
 
-		mapObjCoords.sort(function(first, second) {
-			return second.z - first.z;
+		mapObjCoords.sort((a, b) => {
+			return b.z - a.z;
 		});
 
 		let layer = 1;
-		for (let mapObjCoord of mapObjCoords) {
-			const selector = "[data-id=\"" + mapObjCoord.name + "\"]";
+		for (const mapObjCoord of mapObjCoords) {
+			const selector = "[data-id=\"" + mapObjCoord.id + "\"]";
 			const mapInfo = document.querySelector(selector);
 			mapInfo.classList.toggle("hidden", mapObjCoord.z >= 1);
-			let x = (rendererWidth / 2) * (mapObjCoord.x + 1);
-			let y = (rendererHeight / 2) * -(mapObjCoord.y - 1);
+			let x = mapObjCoord.x;
+			let y = mapObjCoord.y;
 			if (mapInfo.classList.contains("building")) {
 				x = x - mapInfo.getBoundingClientRect().width / 2;
 				y = y - (mapInfo.getBoundingClientRect().height + 6);
@@ -265,6 +266,7 @@ function setMapInfoPosition() {
 		}
 		filterMapInfoIcon();
 	}
+	return mapObjCoords;
 }
 
 // 引数の名前のオブジェクトのcanvas上のx座標とy座標を返す関数
@@ -272,7 +274,7 @@ function getMapObjectCoord(target) {
 	const targetWorldPosition = target.getWorldPosition(new THREE.Vector3());
 	const targetCameraNDC = targetWorldPosition.project(cameras[cameraMode]);
 	
-	return [targetCameraNDC.x, targetCameraNDC.y, targetCameraNDC.z];
+	return {"x": targetCameraNDC.x, "y": targetCameraNDC.y, "z": targetCameraNDC.z};
 }
 
 // 教室名やアイコンなどを作る関数
@@ -296,7 +298,7 @@ function createMapInfo(maps) {
 							case "アイコン":
 								// アイコンを作る
 								mapInfo.classList.add("icon");
-								mapInfo.dataset.id = mapInfoProps.id;
+								mapInfo.dataset.id = mapObj.name;
 								mapInfo.dataset.filterItem = mapInfoProps.filterItem;
 								const icon = document.createElement("img");
 								icon.src = iconPath + mapInfoProps.icon;
@@ -312,7 +314,7 @@ function createMapInfo(maps) {
 						// 建物の情報を作る
 						mapInfo.classList.add("building");
 						mapInfo.classList.add("destinationName");
-						mapInfo.dataset.id = mapObjName;
+						mapInfo.dataset.id = mapObj.name;
 						mapInfo.dataset.destination = mapObjName;
 
 						const name = document.createElement("div");
@@ -364,7 +366,7 @@ function createMapInfo(maps) {
 						if (mapInfoProps.filterItem) {
 							// アイコンを作る
 							mapInfo.classList.add("icon");
-							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.id = mapObj.name;
 							mapInfo.dataset.filterItem = mapInfoProps.filterItem;
 
 							const icon = document.createElement("img");
@@ -390,7 +392,7 @@ function createMapInfo(maps) {
 						case "遷移":
 							// 遷移要素を作る
 							mapInfo.classList.add("destinationName");
-							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.id = mapObj.name;
 							mapInfo.dataset.destination = mapInfoProps.destination;
 							mapInfo.textContent = mapInfoProps.name;
 							mapArea.append(mapInfo);
@@ -402,7 +404,7 @@ function createMapInfo(maps) {
 						case "アイコン":
 							// アイコンを作る
 							mapInfo.classList.add("icon");
-							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.id = mapObj.name;
 							mapInfo.dataset.filterItem = mapInfoProps.filterItem;
 							const icon = document.createElement("img");
 							icon.src = iconPath + mapInfoProps.icon;
@@ -414,7 +416,7 @@ function createMapInfo(maps) {
 						default:
 							// 教室名を作る
 							mapInfo.classList.add("name");
-							mapInfo.dataset.id = mapInfoProps.id;
+							mapInfo.dataset.id = mapObj.name;
 							mapInfo.dataset.priority = mapInfoProps.priority;
 							mapInfo.textContent = mapInfoProps.name;
 							mapArea.append(mapInfo);
@@ -498,6 +500,7 @@ async function loadMap(maps) {
 	const loader = new GLTFLoader();
 	const distance = 1.5;
 
+	showLoading();
 	let count = 0;
 	for (const fileName in maps) {
 		const mapDataPath = maps[fileName]["dirPath"] + fileName;
@@ -517,6 +520,7 @@ async function loadMap(maps) {
 		scenes[currentSceneName].add(map);
 		count++;
 	}
+	hideLoading();
 }
 
 async function moveCameraTo(floorName = null) {
