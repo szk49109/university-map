@@ -102,9 +102,9 @@ let mapInfoList = null;
 let buildingIcons = null;
 async function initialize() {
 	// テスト
-	const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
+	// const url = "https://script.google.com/macros/s/AKfycbyNt7xYwhZ0Yngscpy-eW9JUbXcxFs9ySDW-iCYBrZhxmCgdawRFKuhqy7zSjs_G8Cc/exec";
 	// 正式
-	// const url = "https://script.google.com/macros/s/AKfycbzvO7TkGmvXNKnMMGmvVYbeN4WxkOEMCxJIi7bynQv0Qp1XA8SPrir8lcDPG9LUguDq/exec";
+	const url = "https://script.google.com/macros/s/AKfycbzctuWuhGcYI4qFwHgYxNAcRqXMR-WGvP-toGL1JSAtj20lKU4bowkSmeNn9594fv7M/exec";
 
 	// レンダラーとカメラのサイズの初期化
 	resize();
